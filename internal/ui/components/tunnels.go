@@ -54,10 +54,19 @@ func (t *TunnelsPanel) Cursor() int {
 	return t.cursor
 }
 
-// SelectedTunnel returns the currently selected tunnel.
+// SelectedTunnel returns the currently selected ECS tunnel, or nil if an API Gateway tunnel is selected.
 func (t *TunnelsPanel) SelectedTunnel() *model.Tunnel {
 	if t.cursor >= 0 && t.cursor < len(t.tunnels) {
 		return &t.tunnels[t.cursor]
+	}
+	return nil
+}
+
+// SelectedAPIGatewayTunnel returns the currently selected API Gateway tunnel, or nil if an ECS tunnel is selected.
+func (t *TunnelsPanel) SelectedAPIGatewayTunnel() *model.APIGatewayTunnel {
+	apiGWIndex := t.cursor - len(t.tunnels)
+	if apiGWIndex >= 0 && apiGWIndex < len(t.apiGWTunnels) {
+		return &t.apiGWTunnels[apiGWIndex]
 	}
 	return nil
 }

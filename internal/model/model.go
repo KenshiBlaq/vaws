@@ -337,6 +337,18 @@ type Function struct {
 	PackageType  string // Zip or Image
 }
 
+// InvocationResult represents the result of a Lambda function invocation.
+type InvocationResult struct {
+	FunctionName    string
+	StatusCode      int
+	ExecutedVersion string
+	Payload         string        // Response payload as JSON string
+	FunctionError   string        // Error type if function errored (e.g., "Handled", "Unhandled")
+	LogResult       string        // Base64 encoded last 4KB of execution log
+	Duration        time.Duration // Client-side measured duration
+	InvokedAt       time.Time
+}
+
 // RestAPI represents an API Gateway REST API (v1).
 type RestAPI struct {
 	ID             string

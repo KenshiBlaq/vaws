@@ -19,17 +19,25 @@ type Command struct {
 
 // AvailableCommands lists all supported commands
 var AvailableCommands = []Command{
-	{Name: "stacks", Aliases: []string{"st", "stack", "cfn"}, Description: "CloudFormation stacks"},
-	{Name: "services", Aliases: []string{"svc", "service", "ecs"}, Description: "ECS services"},
-	{Name: "clusters", Aliases: []string{"cl", "cluster"}, Description: "ECS clusters"},
-	{Name: "tasks", Aliases: []string{"task", "t"}, Description: "ECS tasks"},
+	// Resource views (matching quick keys 0-5)
+	{Name: "main", Aliases: []string{"home", "menu", "0"}, Description: "Main menu [0]"},
+	{Name: "ecs", Aliases: []string{"clusters", "cl", "1"}, Description: "ECS clusters [1]"},
+	{Name: "lambda", Aliases: []string{"fn", "functions", "lam", "2"}, Description: "Lambda functions [2]"},
+	{Name: "sqs", Aliases: []string{"queues", "queue", "3"}, Description: "SQS queues [3]"},
+	{Name: "apigateway", Aliases: []string{"apigw", "api", "gw", "4"}, Description: "API Gateway [4]"},
+	{Name: "stacks", Aliases: []string{"st", "stack", "cfn", "5"}, Description: "CloudFormation stacks [5]"},
+
+	// Other views
 	{Name: "tunnels", Aliases: []string{"tun", "tunnel", "pf"}, Description: "Port forward tunnels"},
-	{Name: "lambda", Aliases: []string{"fn", "functions", "lam"}, Description: "Lambda functions"},
-	{Name: "apigateway", Aliases: []string{"apigw", "api", "gw"}, Description: "API Gateway"},
+
+	// Settings
+	{Name: "region", Aliases: []string{"reg"}, Description: "Change AWS region"},
+
+	// Actions
+	{Name: "refresh", Aliases: []string{"reload"}, Description: "Refresh current view"},
 	{Name: "logs", Aliases: []string{"log", "l"}, Description: "Toggle logs panel"},
-	{Name: "refresh", Aliases: []string{"r", "reload"}, Description: "Refresh current view"},
-	{Name: "quit", Aliases: []string{"q", "exit"}, Description: "Quit application"},
 	{Name: "help", Aliases: []string{"h", "?"}, Description: "Show help"},
+	{Name: "quit", Aliases: []string{"q", "exit"}, Description: "Quit application"},
 }
 
 // CommandResult is the result of executing a command
@@ -244,13 +252,4 @@ func (c *CommandPalette) View() string {
 	}
 
 	return boxStyle.Render(content.String())
-}
-
-// CommandBindings returns key bindings for command mode
-func CommandBindings() []KeyBinding {
-	return []KeyBinding{
-		{Key: "enter", Desc: "execute"},
-		{Key: "tab", Desc: "complete"},
-		{Key: "esc", Desc: "cancel"},
-	}
 }

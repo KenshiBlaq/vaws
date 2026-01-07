@@ -73,3 +73,57 @@ func (c *Client) FetchLogs(ctx context.Context, logGroup, logStream string, star
 func BuildLogStreamName(prefix, containerName, taskID string) string {
 	return fmt.Sprintf("%s/%s/%s", prefix, containerName, taskID)
 }
+
+// FetchLambdaLogs retrieves logs from CloudWatch for a Lambda function.
+// Unlike FetchLogs, this queries across ALL log streams in the log group,
+// which is ideal for Lambda functions where each invocation creates a new stream.
+// startTime is milliseconds since epoch for incremental fetching.
+func (c *Client) FetchLambdaLogs(ctx context.Context, logGroup string, startTime int64, limit int32) ([]model.CloudWatchLogEntry, int64, error) {
+	log.Debug("Fetching Lambda CloudWatch logs: group=%s, startTime=%d", logGroup, startTime)
+
+	input := &cloudwatchlogs.FilterLogEventsInput{
+		LogGroupName: aws.String(logGroup),
+		Limit:        aws.Int32(limit),
+	}
+
+	if startTime > 0 {
+		input.StartTime = aws.Int64(startTime)
+	}
+
+	var entries []model.CloudWatchLogEntry
+	var lastTimestamp int64
+
+	paginator := cloudwatchlogs.NewFilterLogEventsPaginator(c.cwlogs, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, startTime, fmt.Errorf("failed to fetch Lambda logs: %w", err)
+		}
+
+		for _, event := range page.Events {
+			entry := model.CloudWatchLogEntry{
+				Timestamp:     time.UnixMilli(aws.ToInt64(event.Timestamp)),
+				Message:       aws.ToString(event.Message),
+				IngestionTime: time.UnixMilli(aws.ToInt64(event.IngestionTime)),
+				LogStreamName: aws.ToString(event.LogStreamName),
+			}
+			entries = append(entries, entry)
+
+			if aws.ToInt64(event.Timestamp) > lastTimestamp {
+				lastTimestamp = aws.ToInt64(event.Timestamp)
+			}
+		}
+	}
+
+	if len(entries) > 0 {
+		log.Debug("Fetched %d Lambda log entries from CloudWatch", len(entries))
+	}
+
+	nextStartTime := startTime
+	if lastTimestamp > 0 {
+		nextStartTime = lastTimestamp + 1
+	}
+
+	return entries, nextStartTime, nil
+}

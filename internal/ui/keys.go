@@ -26,6 +26,7 @@ type KeyMap struct {
 	StopTunnel     key.Binding
 	RestartTunnel  key.Binding
 	ClearTunnels   key.Binding
+	LambdaInvoke   key.Binding
 
 	// Log scrolling
 	LogScrollUp   key.Binding
@@ -115,6 +116,10 @@ func DefaultKeyMap() KeyMap {
 		ClearTunnels: key.NewBinding(
 			key.WithKeys("c"),
 			key.WithHelp("c", "clear terminated"),
+		),
+		LambdaInvoke: key.NewBinding(
+			key.WithKeys("i"),
+			key.WithHelp("i", "invoke"),
 		),
 		LogScrollUp: key.NewBinding(
 			key.WithKeys("K", "pgup"),

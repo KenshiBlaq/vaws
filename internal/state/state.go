@@ -22,11 +22,12 @@ const (
 	ViewAPIGateway
 	ViewAPIStages
 	ViewAPIRoutes
-	ViewJumpHostSelect    // Select jump host for private API Gateway tunnel
-	ViewContainerSelect   // Select container for port forwarding
-	ViewCloudWatchLogs    // CloudWatch logs streaming view
-	ViewSQS               // SQS queues view
-	ViewSQSDetails        // SQS queue details view
+	ViewJumpHostSelect  // Select jump host for private API Gateway tunnel
+	ViewContainerSelect // Select container for port forwarding
+	ViewCloudWatchLogs  // CloudWatch logs streaming view
+	ViewSQS             // SQS queues view
+	ViewSQSDetails      // SQS queue details view
+	ViewRegionSelect    // Region selection view
 )
 
 // State holds all application state.
@@ -73,6 +74,11 @@ type State struct {
 	FunctionsError   error
 	SelectedFunction *model.Function
 
+	// Lambda invocation state
+	LambdaInvocationResult  *model.InvocationResult
+	LambdaInvocationLoading bool
+	LambdaInvocationError   error
+
 	// API Gateway data
 	RestAPIs         []model.RestAPI
 	HttpAPIs         []model.HttpAPI
@@ -113,6 +119,7 @@ type State struct {
 	CloudWatchSelectedContainer int
 	CloudWatchServiceContext    *model.Service
 	CloudWatchTaskContext       *model.Task
+	CloudWatchLambdaContext     *model.Function // For Lambda function logs
 
 	// SQS Queues state
 	Queues        []model.Queue
@@ -237,6 +244,13 @@ func (s *State) ClearFunctions() {
 	s.SelectedFunction = nil
 }
 
+// ClearLambdaInvocation clears Lambda invocation state.
+func (s *State) ClearLambdaInvocation() {
+	s.LambdaInvocationResult = nil
+	s.LambdaInvocationLoading = false
+	s.LambdaInvocationError = nil
+}
+
 // ClearAPIs clears API Gateway data.
 func (s *State) ClearAPIs() {
 	s.RestAPIs = nil
@@ -296,6 +310,7 @@ func (s *State) ClearCloudWatchLogs() {
 	s.CloudWatchSelectedContainer = 0
 	s.CloudWatchServiceContext = nil
 	s.CloudWatchTaskContext = nil
+	s.CloudWatchLambdaContext = nil
 }
 
 // ClearQueues clears SQS queue data.

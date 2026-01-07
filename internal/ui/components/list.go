@@ -20,25 +20,32 @@ type ListItem struct {
 
 // List is a scrollable, selectable list component.
 type List struct {
-	title    string
-	items    []ListItem
-	cursor   int
-	offset   int
-	width    int
-	height   int
-	loading  bool
-	errMsg   string
-	emptyMsg string
-	spinner  *Spinner
+	title     string
+	showTitle bool
+	items     []ListItem
+	cursor    int
+	offset    int
+	width     int
+	height    int
+	loading   bool
+	errMsg    string
+	emptyMsg  string
+	spinner   *Spinner
 }
 
 // NewList creates a new List component.
 func NewList(title string) *List {
 	return &List{
-		title:    title,
-		emptyMsg: "No items found",
-		spinner:  NewSpinner(),
+		title:     title,
+		showTitle: false, // Title is shown in Container border now
+		emptyMsg:  "No items found",
+		spinner:   NewSpinner(),
 	}
+}
+
+// SetShowTitle sets whether to show the title header.
+func (l *List) SetShowTitle(show bool) {
+	l.showTitle = show
 }
 
 // Spinner returns the list's spinner for external tick updates.
@@ -145,7 +152,11 @@ func (l *List) clampOffset() {
 }
 
 func (l *List) visibleItemCount() int {
-	return max(1, l.height-4)
+	// Account for title line if shown, plus some padding
+	if l.showTitle {
+		return max(1, l.height-4)
+	}
+	return max(1, l.height-2)
 }
 
 // View renders the list.
@@ -157,13 +168,15 @@ func (l *List) View() string {
 		PaddingLeft(1).
 		PaddingRight(1)
 
-	// Title with count
-	titleText := l.title
-	if len(l.items) > 0 {
-		titleText = fmt.Sprintf("%s (%d)", l.title, len(l.items))
+	// Title with count (only if showTitle is true)
+	if l.showTitle {
+		titleText := l.title
+		if len(l.items) > 0 {
+			titleText = fmt.Sprintf("%s (%d)", l.title, len(l.items))
+		}
+		b.WriteString(s.SidebarTitle.Render(titleText))
+		b.WriteString("\n")
 	}
-	b.WriteString(s.SidebarTitle.Render(titleText))
-	b.WriteString("\n")
 
 	// Loading state
 	if l.loading {

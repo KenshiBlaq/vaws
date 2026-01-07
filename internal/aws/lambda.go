@@ -45,6 +45,48 @@ func (c *Client) DescribeFunction(ctx context.Context, functionName string) (*mo
 	return &fn, nil
 }
 
+// InvokeFunction invokes a Lambda function with the given payload.
+// Returns the invocation result including response payload and execution metadata.
+func (c *Client) InvokeFunction(ctx context.Context, functionName, payload string) (*model.InvocationResult, error) {
+	start := time.Now()
+
+	input := &lambda.InvokeInput{
+		FunctionName: aws.String(functionName),
+		LogType:      types.LogTypeTail, // Get last 4KB of execution log
+	}
+
+	// Only set payload if non-empty
+	if payload != "" {
+		input.Payload = []byte(payload)
+	}
+
+	out, err := c.lambda.Invoke(ctx, input)
+	duration := time.Since(start)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to invoke function %s: %w", functionName, err)
+	}
+
+	result := &model.InvocationResult{
+		FunctionName:    functionName,
+		StatusCode:      int(out.StatusCode),
+		ExecutedVersion: aws.ToString(out.ExecutedVersion),
+		Payload:         string(out.Payload),
+		Duration:        duration,
+		InvokedAt:       start,
+	}
+
+	if out.FunctionError != nil {
+		result.FunctionError = *out.FunctionError
+	}
+
+	if out.LogResult != nil {
+		result.LogResult = *out.LogResult
+	}
+
+	return result, nil
+}
+
 // convertFunction converts an AWS Lambda function configuration to our model.
 func convertFunction(fn types.FunctionConfiguration) model.Function {
 	return convertFunctionConfig(fn)
