@@ -39,3 +39,6 @@ dist/
 # Local config
 .env
 .env.local
+
+# Private notes
+ROADMAP_INTERNAL.md
