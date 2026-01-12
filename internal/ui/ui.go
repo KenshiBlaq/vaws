@@ -124,6 +124,11 @@ type Model struct {
 
 	// Track view before region selection to return to it
 	viewBeforeRegionSelect state.View
+
+	// Lazy loading channels
+	functionsResultChan chan functionsLoadedMsg
+	queuesResultChan    chan queuesLoadedMsg
+	tablesResultChan    chan tablesLoadedMsg
 }
 
 // New creates a new Model.
@@ -510,14 +515,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateServicesList()
 
 	case functionsLoadedMsg:
-		m.state.FunctionsLoading = false
-		m.refreshIndicator.SetRefreshing(false)
 		if msg.err != nil {
+			m.state.FunctionsLoading = false
 			m.state.FunctionsError = msg.err
+			m.refreshIndicator.SetRefreshing(false)
+			m.lambdaList.SetLoading(false)
 			m.logger.Error("Failed to load Lambda functions: %v", msg.err)
 		} else {
-			m.state.Functions = msg.functions
+			// Handle incremental loading
+			if msg.isAppend {
+				m.state.Functions = append(m.state.Functions, msg.functions...)
+				m.logger.Debug("Loaded %d more Lambda functions (total: %d)", len(msg.functions), len(m.state.Functions))
+			} else {
+				m.state.Functions = msg.functions
+				m.logger.Info("Loaded %d Lambda functions", len(msg.functions))
+			}
 			m.state.FunctionsError = nil
+
+			// Update UI immediately to show partial results
+			m.updateLambdaList()
+
+			// Continue loading if more pages available
+			if msg.hasMore {
+				return m, m.continueFunctionsLoad()
+			}
+
+			// All done
+			m.state.FunctionsLoading = false
+			m.lambdaList.SetLoading(false)
+			m.refreshIndicator.SetRefreshing(false)
 		}
 		m.updateLambdaList()
 
@@ -848,16 +874,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case queuesLoadedMsg:
-		m.state.QueuesLoading = false
-		m.sqsTable.SetLoading(false)
-		m.refreshIndicator.SetRefreshing(false)
 		if msg.err != nil {
+			m.state.QueuesLoading = false
 			m.state.QueuesError = msg.err
+			m.refreshIndicator.SetRefreshing(false)
+			m.sqsTable.SetLoading(false)
 			m.logger.Error("Failed to load SQS queues: %v", msg.err)
 		} else {
-			m.state.Queues = msg.queues
+			// Handle incremental loading
+			if msg.isAppend {
+				m.state.Queues = append(m.state.Queues, msg.queues...)
+				m.logger.Debug("Loaded %d more SQS queues (total: %d)", len(msg.queues), len(m.state.Queues))
+			} else {
+				m.state.Queues = msg.queues
+				m.logger.Info("Loaded %d SQS queues", len(msg.queues))
+			}
 			m.state.QueuesError = nil
-			m.logger.Info("Loaded %d SQS queues", len(msg.queues))
+
+			// Update UI immediately to show partial results
+			m.updateQueuesList()
+
+			// Continue loading if more pages available
+			if msg.hasMore {
+				return m, m.continueQueuesLoad()
+			}
+
+			// All done
+			m.state.QueuesLoading = false
+			m.sqsTable.SetLoading(false)
+			m.refreshIndicator.SetRefreshing(false)
 		}
 		m.updateQueuesList()
 
@@ -875,16 +920,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateClustersList()
 
 	case tablesLoadedMsg:
-		m.state.TablesLoading = false
-		m.dynamodbTable.SetLoading(false)
-		m.refreshIndicator.SetRefreshing(false)
 		if msg.err != nil {
+			m.state.TablesLoading = false
 			m.state.TablesError = msg.err
+			m.refreshIndicator.SetRefreshing(false)
+			m.dynamodbTable.SetLoading(false)
 			m.logger.Error("Failed to load DynamoDB tables: %v", msg.err)
 		} else {
-			m.state.Tables = msg.tables
+			// Handle incremental loading
+			if msg.isAppend {
+				m.state.Tables = append(m.state.Tables, msg.tables...)
+				m.logger.Debug("Loaded %d more DynamoDB tables (total: %d)", len(msg.tables), len(m.state.Tables))
+			} else {
+				m.state.Tables = msg.tables
+				m.logger.Info("Loaded %d DynamoDB tables", len(msg.tables))
+			}
 			m.state.TablesError = nil
-			m.logger.Info("Loaded %d DynamoDB tables", len(msg.tables))
+
+			// Update UI immediately to show partial results
+			m.updateTablesList()
+
+			// Continue loading if more pages available
+			if msg.hasMore {
+				return m, m.continueTablesLoad()
+			}
+
+			// All done
+			m.state.TablesLoading = false
+			m.dynamodbTable.SetLoading(false)
+			m.refreshIndicator.SetRefreshing(false)
 		}
 		m.updateTablesList()
 

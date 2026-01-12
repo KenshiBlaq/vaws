@@ -128,7 +128,7 @@ func (m *Model) loadServicesForCluster() tea.Cmd {
 	)
 }
 
-// loadFunctions loads Lambda functions.
+// loadFunctions loads Lambda functions with lazy loading.
 func (m *Model) loadFunctions() tea.Cmd {
 	m.state.FunctionsLoading = true
 	m.lambdaList.SetLoading(true)
@@ -142,42 +142,85 @@ func (m *Model) loadFunctions() tea.Cmd {
 		m.logger.Info("Loading all Lambda functions...")
 	}
 
+	// Use channel to receive incremental results
+	resultChan := make(chan functionsLoadedMsg, 10)
+
+	// Start background loading
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		defer close(resultChan)
+
+		if stackName != "" {
+			// Stack-specific loading (no pagination needed, usually small)
+			functionNames, err := m.client.GetLambdaFunctionsFromStack(ctx, stackName)
+			if err != nil {
+				resultChan <- functionsLoadedMsg{functions: nil, err: err}
+				return
+			}
+
+			if len(functionNames) == 0 {
+				resultChan <- functionsLoadedMsg{functions: []model.Function{}, err: nil}
+				return
+			}
+
+			var functions []model.Function
+			for _, name := range functionNames {
+				fn, err := m.client.DescribeFunction(ctx, name)
+				if err != nil {
+					continue
+				}
+				functions = append(functions, *fn)
+			}
+			resultChan <- functionsLoadedMsg{functions: functions, err: nil}
+			return
+		}
+
+		// Lazy load with incremental results
+		isFirst := true
+		err := m.client.ListFunctionsPagedCallback(ctx, func(functions []model.Function, hasMore bool) bool {
+			resultChan <- functionsLoadedMsg{
+				functions: functions,
+				err:       nil,
+				hasMore:   hasMore,
+				isAppend:  !isFirst,
+			}
+			isFirst = false
+			return true // continue loading
+		})
+		if err != nil {
+			resultChan <- functionsLoadedMsg{functions: nil, err: err}
+		}
+	}()
+
+	// Return command that reads from channel
 	return tea.Batch(
 		m.lambdaList.Spinner().TickCmd(),
 		func() tea.Msg {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			if stackName != "" {
-				// Get function names from the stack
-				functionNames, err := m.client.GetLambdaFunctionsFromStack(ctx, stackName)
-				if err != nil {
-					return functionsLoadedMsg{functions: nil, err: err}
-				}
-
-				// If no functions in stack, return empty list
-				if len(functionNames) == 0 {
-					return functionsLoadedMsg{functions: []model.Function{}, err: nil}
-				}
-
-				// Get details for each function
-				var functions []model.Function
-				for _, name := range functionNames {
-					fn, err := m.client.DescribeFunction(ctx, name)
-					if err != nil {
-						// Log but continue with other functions
-						continue
-					}
-					functions = append(functions, *fn)
-				}
-				return functionsLoadedMsg{functions: functions, err: nil}
+			msg, ok := <-resultChan
+			if !ok {
+				return nil
 			}
-
-			// No stack selected - load all functions
-			functions, err := m.client.ListFunctions(ctx)
-			return functionsLoadedMsg{functions: functions, err: err}
+			// Store channel for subsequent reads
+			m.functionsResultChan = resultChan
+			return msg
 		},
 	)
+}
+
+// continueFunctionsLoad continues reading from the functions result channel.
+func (m *Model) continueFunctionsLoad() tea.Cmd {
+	if m.functionsResultChan == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg, ok := <-m.functionsResultChan
+		if !ok {
+			m.functionsResultChan = nil
+			return nil
+		}
+		return msg
+	}
 }
 
 // loadAPIs loads API Gateway REST and HTTP APIs.
@@ -279,7 +322,7 @@ func (m *Model) loadEC2Instances() tea.Cmd {
 	)
 }
 
-// loadQueues loads SQS queues.
+// loadQueues loads SQS queues with lazy loading.
 func (m *Model) loadQueues() tea.Cmd {
 	m.state.QueuesLoading = true
 	m.sqsTable.SetLoading(true)
@@ -293,46 +336,90 @@ func (m *Model) loadQueues() tea.Cmd {
 		m.logger.Info("Loading all SQS queues...")
 	}
 
+	// Use channel for incremental results
+	resultChan := make(chan queuesLoadedMsg, 10)
+
+	// Start background loading
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		defer close(resultChan)
+
+		if stackName != "" {
+			// Stack-specific loading (no pagination, usually small)
+			queueURLs, err := m.client.GetQueuesFromStack(ctx, stackName)
+			if err != nil {
+				resultChan <- queuesLoadedMsg{queues: nil, err: err}
+				return
+			}
+
+			if len(queueURLs) == 0 {
+				resultChan <- queuesLoadedMsg{queues: []model.Queue{}, err: nil}
+				return
+			}
+
+			// Get details for each queue
+			var queues []model.Queue
+			for _, url := range queueURLs {
+				queue, err := m.client.GetQueueAttributes(ctx, url)
+				if err != nil {
+					continue
+				}
+				queues = append(queues, *queue)
+			}
+
+			// Fetch DLQ message counts
+			queues = m.enrichQueuesWithDLQ(ctx, queues)
+
+			resultChan <- queuesLoadedMsg{queues: queues, err: nil}
+			return
+		}
+
+		// Lazy load with incremental results
+		isFirst := true
+		err := m.client.ListQueuesPagedCallback(ctx, func(queues []model.Queue, hasMore bool) bool {
+			resultChan <- queuesLoadedMsg{
+				queues:   queues,
+				err:      nil,
+				hasMore:  hasMore,
+				isAppend: !isFirst,
+			}
+			isFirst = false
+			return true // continue loading
+		})
+		if err != nil {
+			resultChan <- queuesLoadedMsg{queues: nil, err: err}
+		}
+	}()
+
+	// Return command that reads from channel
 	return tea.Batch(
 		m.sqsTable.Spinner().TickCmd(),
 		func() tea.Msg {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			if stackName != "" {
-				// Get queue URLs from the stack
-				queueURLs, err := m.client.GetQueuesFromStack(ctx, stackName)
-				if err != nil {
-					return queuesLoadedMsg{queues: nil, err: err}
-				}
-
-				// If no queues in stack, return empty list
-				if len(queueURLs) == 0 {
-					return queuesLoadedMsg{queues: []model.Queue{}, err: nil}
-				}
-
-				// Get details for each queue
-				var queues []model.Queue
-				for _, url := range queueURLs {
-					queue, err := m.client.GetQueueAttributes(ctx, url)
-					if err != nil {
-						// Log but continue with other queues
-						continue
-					}
-					queues = append(queues, *queue)
-				}
-
-				// Fetch DLQ message counts
-				queues = m.enrichQueuesWithDLQ(ctx, queues)
-
-				return queuesLoadedMsg{queues: queues, err: nil}
+			msg, ok := <-resultChan
+			if !ok {
+				return nil
 			}
-
-			// No stack selected - load all queues
-			queues, err := m.client.ListQueues(ctx)
-			return queuesLoadedMsg{queues: queues, err: err}
+			// Store channel for subsequent reads
+			m.queuesResultChan = resultChan
+			return msg
 		},
 	)
+}
+
+// continueQueuesLoad continues reading from the queues result channel.
+func (m *Model) continueQueuesLoad() tea.Cmd {
+	if m.queuesResultChan == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg, ok := <-m.queuesResultChan
+		if !ok {
+			m.queuesResultChan = nil
+			return nil
+		}
+		return msg
+	}
 }
 
 // enrichQueuesWithDLQ fetches DLQ message counts for queues that have DLQs.
@@ -431,21 +518,66 @@ func (m *Model) loadClusters() tea.Cmd {
 	)
 }
 
-// loadTables loads DynamoDB tables.
+// loadTables loads DynamoDB tables with lazy loading.
 func (m *Model) loadTables() tea.Cmd {
 	m.state.TablesLoading = true
 	m.dynamodbTable.SetLoading(true)
 	m.logger.Info("Loading DynamoDB tables...")
 
+	// Use channel for incremental results
+	resultChan := make(chan tablesLoadedMsg, 10)
+
+	// Start background loading
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		defer close(resultChan)
+
+		// Lazy load with incremental results
+		isFirst := true
+		err := m.client.ListTablesPagedCallback(ctx, func(tables []model.Table, hasMore bool) bool {
+			resultChan <- tablesLoadedMsg{
+				tables:   tables,
+				err:      nil,
+				hasMore:  hasMore,
+				isAppend: !isFirst,
+			}
+			isFirst = false
+			return true // continue loading
+		})
+		if err != nil {
+			resultChan <- tablesLoadedMsg{tables: nil, err: err}
+		}
+	}()
+
+	// Return command that reads from channel
 	return tea.Batch(
 		m.dynamodbTable.Spinner().TickCmd(),
 		func() tea.Msg {
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			defer cancel()
-			tables, err := m.client.ListTables(ctx)
-			return tablesLoadedMsg{tables: tables, err: err}
+			msg, ok := <-resultChan
+			if !ok {
+				return nil
+			}
+			// Store channel for subsequent reads
+			m.tablesResultChan = resultChan
+			return msg
 		},
 	)
+}
+
+// continueTablesLoad continues reading from the tables result channel.
+func (m *Model) continueTablesLoad() tea.Cmd {
+	if m.tablesResultChan == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg, ok := <-m.tablesResultChan
+		if !ok {
+			m.tablesResultChan = nil
+			return nil
+		}
+		return msg
+	}
 }
 
 // executeDynamoDBQuery executes a DynamoDB query.

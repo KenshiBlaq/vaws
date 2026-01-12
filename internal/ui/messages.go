@@ -23,6 +23,8 @@ type (
 	functionsLoadedMsg struct {
 		functions []model.Function
 		err       error
+		hasMore   bool // true if more pages are being loaded
+		isAppend  bool // true if this is an incremental update
 	}
 
 	// restAPIsLoadedMsg is sent when REST APIs are loaded.
@@ -126,14 +128,18 @@ type (
 
 	// queuesLoadedMsg is sent when SQS queues are loaded.
 	queuesLoadedMsg struct {
-		queues []model.Queue
-		err    error
+		queues   []model.Queue
+		err      error
+		hasMore  bool // true if more items are being loaded
+		isAppend bool // true if this is an incremental update
 	}
 
 	// tablesLoadedMsg is sent when DynamoDB tables are loaded.
 	tablesLoadedMsg struct {
-		tables []model.Table
-		err    error
+		tables   []model.Table
+		err      error
+		hasMore  bool // true if more items are being loaded
+		isAppend bool // true if this is an incremental update
 	}
 
 	// clustersLoadedMsg is sent when ECS clusters are loaded.

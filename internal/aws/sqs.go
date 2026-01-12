@@ -213,3 +213,94 @@ func extractQueueNameFromURL(url string) string {
 	}
 	return url
 }
+
+// ListQueuesPagedCallback lists SQS queues with a callback for each batch.
+// This enables lazy loading by delivering results incrementally.
+// The callback receives queues from each batch and returns true to continue or false to stop.
+func (c *Client) ListQueuesPagedCallback(ctx context.Context, callback func(queues []model.Queue, hasMore bool) bool) error {
+	log.Debug("Listing SQS queues with lazy loading...")
+
+	// Use smaller page size for responsive incremental loading
+	paginator := sqs.NewListQueuesPaginator(c.sqs, &sqs.ListQueuesInput{
+		MaxResults: aws.Int32(25),
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list queues: %w", err)
+		}
+
+		if len(page.QueueUrls) == 0 {
+			continue
+		}
+
+		// Fetch attributes for this batch of queue URLs
+		queues := c.fetchQueueAttributesBatch(ctx, page.QueueUrls)
+
+		hasMore := paginator.HasMorePages()
+		if !callback(queues, hasMore) {
+			break
+		}
+	}
+
+	return nil
+}
+
+// fetchQueueAttributesBatch fetches attributes for a batch of queue URLs in parallel.
+func (c *Client) fetchQueueAttributesBatch(ctx context.Context, queueURLs []string) []model.Queue {
+	type queueResult struct {
+		index int
+		queue *model.Queue
+		err   error
+	}
+
+	results := make(chan queueResult, len(queueURLs))
+	sem := make(chan struct{}, maxConcurrentSQSCalls)
+
+	var wg sync.WaitGroup
+	for i, url := range queueURLs {
+		wg.Add(1)
+		go func(idx int, queueURL string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			queue, err := c.GetQueueAttributes(ctx, queueURL)
+			results <- queueResult{index: idx, queue: queue, err: err}
+		}(i, url)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results maintaining order
+	queues := make([]model.Queue, len(queueURLs))
+	validCount := 0
+
+	for result := range results {
+		if result.err != nil {
+			log.Warn("Failed to get attributes for queue: %v", result.err)
+			continue
+		}
+		queues[result.index] = *result.queue
+		validCount++
+	}
+
+	// Filter out empty entries
+	validQueues := make([]model.Queue, 0, validCount)
+	for _, q := range queues {
+		if q.URL != "" {
+			validQueues = append(validQueues, q)
+		}
+	}
+
+	// Sort batch alphabetically
+	sort.Slice(validQueues, func(i, j int) bool {
+		return strings.ToLower(validQueues[i].Name) < strings.ToLower(validQueues[j].Name)
+	})
+
+	return validQueues
+}

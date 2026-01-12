@@ -499,3 +499,94 @@ func convertToAttributeValue(v interface{}) dbtypes.AttributeValue {
 func formatItemAsJSON(item map[string]interface{}) ([]byte, error) {
 	return json.MarshalIndent(item, "", "  ")
 }
+
+// ListTablesPagedCallback lists DynamoDB tables with a callback for each batch.
+// This enables lazy loading by delivering results incrementally.
+// The callback receives tables from each batch and returns true to continue or false to stop.
+func (c *Client) ListTablesPagedCallback(ctx context.Context, callback func(tables []model.Table, hasMore bool) bool) error {
+	log.Debug("Listing DynamoDB tables with lazy loading...")
+
+	// Use smaller page size for responsive incremental loading
+	paginator := dynamodb.NewListTablesPaginator(c.dynamodb, &dynamodb.ListTablesInput{
+		Limit: aws.Int32(25),
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list tables: %w", err)
+		}
+
+		if len(page.TableNames) == 0 {
+			continue
+		}
+
+		// Fetch details for this batch of table names
+		tables := c.fetchTableDetailsBatch(ctx, page.TableNames)
+
+		hasMore := paginator.HasMorePages()
+		if !callback(tables, hasMore) {
+			break
+		}
+	}
+
+	return nil
+}
+
+// fetchTableDetailsBatch fetches details for a batch of table names in parallel.
+func (c *Client) fetchTableDetailsBatch(ctx context.Context, tableNames []string) []model.Table {
+	type tableResult struct {
+		index int
+		table *model.Table
+		err   error
+	}
+
+	results := make(chan tableResult, len(tableNames))
+	sem := make(chan struct{}, maxConcurrentDynamoDBCalls)
+
+	var wg sync.WaitGroup
+	for i, name := range tableNames {
+		wg.Add(1)
+		go func(idx int, tableName string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			table, err := c.DescribeTable(ctx, tableName)
+			results <- tableResult{index: idx, table: table, err: err}
+		}(i, name)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results maintaining order
+	tables := make([]model.Table, len(tableNames))
+	validCount := 0
+
+	for result := range results {
+		if result.err != nil {
+			log.Warn("Failed to describe table: %v", result.err)
+			continue
+		}
+		tables[result.index] = *result.table
+		validCount++
+	}
+
+	// Filter out empty entries
+	validTables := make([]model.Table, 0, validCount)
+	for _, t := range tables {
+		if t.Name != "" {
+			validTables = append(validTables, t)
+		}
+	}
+
+	// Sort batch by name
+	sort.Slice(validTables, func(i, j int) bool {
+		return validTables[i].Name < validTables[j].Name
+	})
+
+	return validTables
+}

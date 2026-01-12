@@ -84,6 +84,14 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return m.handleDynamoDBQueryResultsKey(msg)
 	}
 
+	// Handle CloudWatch logs navigation
+	if m.state.View == state.ViewCloudWatchLogs {
+		if cmd, handled := m.handleCloudWatchLogsKey(msg); handled {
+			return cmd
+		}
+		// Fall through to main handler for shortcuts like 1,2,3,4
+	}
+
 	switch {
 	case matchKey(msg, m.keys.Quit):
 		m.tunnelManager.StopAllTunnels()
@@ -1476,8 +1484,78 @@ func (m *Model) handleDynamoDBQueryResultsKey(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
+// handleCloudWatchLogsKey handles key presses in the CloudWatch logs view.
+// Returns (cmd, handled) - if not handled, caller should continue processing.
+func (m *Model) handleCloudWatchLogsKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.String() {
+	case "ctrl+c":
+		m.tunnelManager.StopAllTunnels()
+		return tea.Quit, true
+
+	case "esc", "backspace":
+		// Go back to tasks view
+		m.state.CloudWatchLogsStreaming = false
+		m.cloudWatchLogsPanel.SetStreaming(false)
+		m.state.View = state.ViewTasks
+		return nil, true
+
+	case "up", "k":
+		m.cloudWatchLogsPanel.ScrollUp()
+		return nil, true
+
+	case "down", "j":
+		m.cloudWatchLogsPanel.ScrollDown()
+		return nil, true
+
+	case "g":
+		// Scroll to top
+		m.cloudWatchLogsPanel.ScrollToTop()
+		return nil, true
+
+	case "G":
+		// Scroll to bottom and enable auto-scroll
+		m.cloudWatchLogsPanel.ScrollToBottom()
+		return nil, true
+
+	case "ctrl+u":
+		// Page up
+		m.cloudWatchLogsPanel.PageUp()
+		return nil, true
+
+	case "ctrl+d":
+		// Page down
+		m.cloudWatchLogsPanel.PageDown()
+		return nil, true
+
+	case "tab":
+		// Switch to next container tab
+		m.cloudWatchLogsPanel.SelectNextTab()
+		m.cloudWatchLogsPanel.Clear()
+		m.state.CloudWatchLogs = nil
+		m.state.CloudWatchLastFetchTime = 0
+		return m.fetchCloudWatchLogs(), true
+
+	case "shift+tab":
+		// Switch to previous container tab
+		m.cloudWatchLogsPanel.SelectPrevTab()
+		m.cloudWatchLogsPanel.Clear()
+		m.state.CloudWatchLogs = nil
+		m.state.CloudWatchLastFetchTime = 0
+		return m.fetchCloudWatchLogs(), true
+	}
+
+	// Not handled - let main handler process (for shortcuts like 1,2,3,4)
+	return nil, false
+}
+
 // handleMouseWheelUp handles mouse wheel scroll up events.
 func (m *Model) handleMouseWheelUp(x int) {
+	// CloudWatch logs view - scroll logs
+	if m.state.View == state.ViewCloudWatchLogs {
+		m.cloudWatchLogsPanel.ScrollUp()
+		return
+	}
+
 	// Determine which pane was scrolled based on X coordinate
 	layout := m.getLayoutMode()
 	if layout != layoutFull {
@@ -1504,6 +1582,12 @@ func (m *Model) handleMouseWheelUp(x int) {
 
 // handleMouseWheelDown handles mouse wheel scroll down events.
 func (m *Model) handleMouseWheelDown(x int) {
+	// CloudWatch logs view - scroll logs
+	if m.state.View == state.ViewCloudWatchLogs {
+		m.cloudWatchLogsPanel.ScrollDown()
+		return
+	}
+
 	// Determine which pane was scrolled based on X coordinate
 	layout := m.getLayoutMode()
 	if layout != layoutFull {

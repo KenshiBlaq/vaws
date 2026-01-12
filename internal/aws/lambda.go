@@ -32,6 +32,32 @@ func (c *Client) ListFunctions(ctx context.Context) ([]model.Function, error) {
 	return functions, nil
 }
 
+// ListFunctionsPagedCallback lists Lambda functions with a callback for each page.
+// This enables lazy loading by delivering results incrementally.
+// The callback receives the functions from each page and returns true to continue or false to stop.
+func (c *Client) ListFunctionsPagedCallback(ctx context.Context, callback func(functions []model.Function, hasMore bool) bool) error {
+	paginator := lambda.NewListFunctionsPaginator(c.lambda, &lambda.ListFunctionsInput{})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list Lambda functions: %w", err)
+		}
+
+		var functions []model.Function
+		for _, fn := range page.Functions {
+			functions = append(functions, convertFunction(fn))
+		}
+
+		hasMore := paginator.HasMorePages()
+		if !callback(functions, hasMore) {
+			break
+		}
+	}
+
+	return nil
+}
+
 // DescribeFunction returns detailed information about a Lambda function.
 func (c *Client) DescribeFunction(ctx context.Context, functionName string) (*model.Function, error) {
 	out, err := c.lambda.GetFunction(ctx, &lambda.GetFunctionInput{

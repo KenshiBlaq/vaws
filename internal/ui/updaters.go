@@ -584,8 +584,14 @@ func (m *Model) updateContainerContext() {
 		m.container.SetTitle(title)
 		m.container.SetItemCount(m.dynamodbQueryResults.ItemCount())
 	case state.ViewCloudWatchLogs:
-		m.container.SetTitle("CloudWatch Logs")
-		m.container.SetItemCount(0)
+		title := "CloudWatch Logs"
+		if m.state.CloudWatchServiceContext != nil {
+			title = "Logs: " + m.state.CloudWatchServiceContext.Name
+		} else if m.state.CloudWatchLambdaContext != nil {
+			title = "Logs: " + m.state.CloudWatchLambdaContext.Name
+		}
+		m.container.SetTitle(title)
+		m.container.SetItemCount(len(m.state.CloudWatchLogs))
 	default:
 		m.container.SetTitle("vaws")
 		m.container.SetItemCount(0)

@@ -158,7 +158,7 @@ func (l *Logs) View() string {
 			levelStyle = lipgloss.NewStyle().Foreground(theme.Text)
 		}
 
-		// Calculate prefix width for continuation lines
+		// Calculate available width for message
 		prefix := fmt.Sprintf("%s %s ",
 			timeStyle.Render(timeStr),
 			levelStyle.Render(fmt.Sprintf("%-5s", entry.Level)),
@@ -169,17 +169,21 @@ func (l *Logs) View() string {
 			availableWidth = 20
 		}
 
-		// Wrap message if too long
-		wrappedLines := wrapText(entry.Message, availableWidth)
-
-		// First line with prefix
-		lines = append(lines, prefix+wrappedLines[0])
-
-		// Continuation lines indented to align with message
-		indent := strings.Repeat(" ", prefixWidth)
-		for j := 1; j < len(wrappedLines); j++ {
-			lines = append(lines, indent+wrappedLines[j])
+		// Truncate very long messages to keep logs readable
+		message := entry.Message
+		truncated := false
+		if len(message) > availableWidth {
+			message = message[:availableWidth-6]
+			truncated = true
 		}
+
+		line := prefix + message
+		if truncated {
+			moreStyle := lipgloss.NewStyle().Foreground(theme.TextDim)
+			line += moreStyle.Render(" [...]")
+		}
+
+		lines = append(lines, line)
 	}
 
 	// Pad with empty lines if needed

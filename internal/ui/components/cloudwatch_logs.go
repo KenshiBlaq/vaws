@@ -188,15 +188,50 @@ func (p *CloudWatchLogsPanel) ScrollToBottom() {
 	p.scrollToBottomLocked()
 }
 
+// ScrollToTop scrolls to oldest logs and disables auto-scroll.
+func (p *CloudWatchLogsPanel) ScrollToTop() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.autoScroll = false
+	p.scroll = 0
+}
+
+// PageUp scrolls up by 10 lines.
+func (p *CloudWatchLogsPanel) PageUp() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.autoScroll = false
+	p.scroll -= 10
+	if p.scroll < 0 {
+		p.scroll = 0
+	}
+}
+
+// PageDown scrolls down by 10 lines.
+func (p *CloudWatchLogsPanel) PageDown() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	maxScroll := p.maxScrollLocked()
+	p.scroll += 10
+	if p.scroll > maxScroll {
+		p.scroll = maxScroll
+	}
+	if p.scroll >= maxScroll {
+		p.autoScroll = true
+	}
+}
+
 func (p *CloudWatchLogsPanel) scrollToBottomLocked() {
 	p.scroll = p.maxScrollLocked()
 }
 
 func (p *CloudWatchLogsPanel) maxScrollLocked() int {
-	// Account for header lines (title + tabs + spacing)
-	headerLines := 4
-	if len(p.containers) <= 1 {
-		headerLines = 3
+	// Account for header line (streaming indicator + container info) and scroll indicator
+	// Header: 1 line if streaming or has containers, else 0
+	// Footer: 1 line for scroll indicator
+	headerLines := 1 // scroll indicator at bottom
+	if p.streaming || len(p.containers) > 0 {
+		headerLines++ // streaming/container header
 	}
 	visibleLines := p.height - headerLines
 	if visibleLines < 1 {
@@ -259,36 +294,27 @@ func (p *CloudWatchLogsPanel) View() string {
 
 	var b strings.Builder
 
-	// Title with streaming indicator
-	titleStyle := lipgloss.NewStyle().
-		Foreground(theme.Primary).
-		Bold(true)
-
-	title := "CloudWatch Logs"
-	if p.serviceName != "" {
-		title = fmt.Sprintf("CloudWatch Logs - %s", p.serviceName)
-	}
+	// Streaming indicator and container info (compact header)
+	var headerParts []string
 
 	if p.streaming {
 		streamingStyle := lipgloss.NewStyle().Foreground(theme.Success)
 		spinnerChar := spinnerFrames[p.spinnerFrame]
-		title += streamingStyle.Render(fmt.Sprintf(" %s STREAMING", spinnerChar))
+		headerParts = append(headerParts, streamingStyle.Render(fmt.Sprintf("%s STREAMING", spinnerChar)))
 	}
-
-	b.WriteString(titleStyle.Render(title))
-	b.WriteString("\n")
 
 	// Container tabs (if multiple containers)
 	if len(p.containers) > 1 {
-		b.WriteString(p.renderTabsLocked())
-		b.WriteString("\n")
+		headerParts = append(headerParts, p.renderTabsLocked())
 	} else if len(p.containers) == 1 {
 		containerStyle := lipgloss.NewStyle().Foreground(theme.TextMuted)
-		b.WriteString(containerStyle.Render("Container: " + p.containers[0].ContainerName))
-		b.WriteString("\n")
+		headerParts = append(headerParts, containerStyle.Render("Container: "+p.containers[0].ContainerName))
 	}
 
-	b.WriteString("\n")
+	if len(headerParts) > 0 {
+		b.WriteString(strings.Join(headerParts, "  "))
+		b.WriteString("\n")
+	}
 
 	// Log entries
 	st := theme.DefaultStyles()
@@ -310,11 +336,13 @@ func (p *CloudWatchLogsPanel) View() string {
 		b.WriteString(st.Muted.Render("No log entries. Waiting for logs..."))
 	} else {
 		// Calculate visible range
-		headerLines := 4
-		if len(p.containers) <= 1 {
-			headerLines = 3
+		// Header: 1 line if streaming or has containers, else 0
+		// Footer: 1 line for scroll indicator
+		headerLines := 1 // scroll indicator
+		if p.streaming || len(p.containers) > 0 {
+			headerLines++ // streaming/container header
 		}
-		maxVisible := p.height - headerLines - 1 // -1 for scroll indicator
+		maxVisible := p.height - headerLines
 		if maxVisible < 1 {
 			maxVisible = 1
 		}
@@ -343,19 +371,24 @@ func (p *CloudWatchLogsPanel) View() string {
 				availableWidth = 20
 			}
 
-			// Wrap long messages
-			wrappedLines := wrapText(message, availableWidth)
-
-			// First line includes timestamp
-			line := fmt.Sprintf("%s %s", timeStyle.Render(timeStr), wrappedLines[0])
-			b.WriteString(line)
-
-			// Continuation lines are indented to align with message
-			indent := strings.Repeat(" ", timestampWidth)
-			for j := 1; j < len(wrappedLines); j++ {
-				b.WriteString("\n")
-				b.WriteString(indent + wrappedLines[j])
+			// Truncate very long messages to keep logs readable
+			// Show first line, and if message is longer, add indicator
+			maxDisplayLen := availableWidth * 2 // Allow up to ~2 lines worth
+			truncated := false
+			if len(message) > maxDisplayLen {
+				message = message[:maxDisplayLen]
+				truncated = true
 			}
+
+			line := fmt.Sprintf("%s %s", timeStyle.Render(timeStr), message)
+
+			// Add truncation indicator
+			if truncated {
+				moreStyle := lipgloss.NewStyle().Foreground(theme.TextDim)
+				line += moreStyle.Render(" [...]")
+			}
+
+			b.WriteString(line)
 
 			if i < end-1 {
 				b.WriteString("\n")
@@ -376,7 +409,6 @@ func (p *CloudWatchLogsPanel) View() string {
 	}
 
 	containerStyle := lipgloss.NewStyle().
-		Padding(1, 2).
 		Width(p.width)
 
 	return containerStyle.Render(b.String())
